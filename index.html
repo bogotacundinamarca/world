@@ -264,7 +264,7 @@
         <div id="sugerencias-busqueda" class="sugerencias-busqueda"></div>
       </div>
       <button class="btn" id="centrar-btn">CENTRAR</button>
-      <button class="btn" id="afiliarse-btn" onclick="window.open('https://qrcontraentrega.com/afiliacion-colombia', '_blank')">AFILIARSE</button>
+      <button class="btn" id="afiliarse-btn">AFILIARSE</button>
     </div>
     <div id="mapa"></div>
     <div class="map-type-selector">
@@ -285,29 +285,64 @@
     let googleMapsLayer;
     let googleSatelliteLayer;
     let currentLayer;
+    let clusters;
+    let ubicacionActivada = false;
 
     // Datos de ubicaciones en Bogotá (solo socios)
     const UBICACIONES = [
       { 
         "id": "1",
-        "nombre": "@wscdistribuidora (Oro)",
-        "direccion": "Cl. 8 # 14-25 Los Mártires, Bogotá", 
-        "latlng": [4.599525, -74.083246], 
-        "url": "https://wscdistribuidora.com",
-        "telefono": "+573156120321",
-        "horario": "L - V 08:00 a 18:00",
-        "servicios": "Somos una empresa que distribuimos mercancia importada de china . Como linea hogar jugeteria flores ortopedicos accesorios de bicicleta iluminacion y trabajamos las temporadas de halloween y diciembre",
+        "nombre": "Almacén La Economía (Bronce)",
+        "direccion": "Carrera 15 #32-45, Chapinero, Bogotá", 
+        "latlng": [4.6486, -74.0624], 
+        "url": "https://bogota.qrcontraentrega.com/almacenlaeconomia",
+        "telefono": "+573001234567",
+        "horario": "L - S 07:00 a 21:00, D 08:00 a 18:00",
+        "servicios": "Abarrotes, víveres y productos de aseo",
         "tipo": "socio"
       },
       { 
         "id": "2",
-        "nombre": "@distriyoxbogota (Bronce)", 
-        "direccion": "Av. Ciudad de Lima #25 - 04 Los Mártires, Bogotá", 
-        "latlng": [4.615495, -74.084126], 
-        "url": "https://distriyoxbogota.qrcontraentrega.com",
-        "telefono": "+573146824438",
-        "horario": "L - D 08:00 a 18:00",
-        "servicios": "bodega mayorista de frutas y verduras",
+        "nombre": "Tienda El Barrio (Bronce)", 
+        "direccion": "Calle 72 #12-35, Bogotá", 
+        "latlng": [4.6582, -74.0589], 
+        "url": "https://bogota.qrcontraentrega.com/tiendaelbarrio",
+        "telefono": "+573002345678",
+        "horario": "L - D 06:00 a 22:00",
+        "servicios": "Productos básicos y alimentos",
+        "tipo": "socio"
+      },
+      { 
+        "id": "3",
+        "nombre": "Supermercado Express (Bronce)", 
+        "direccion": "Avenida 68 #24-39, Bogotá", 
+        "latlng": [4.6781, -74.1053], 
+        "url": "https://bogota.qrcontraentrega.com/supermercadoexpress",
+        "telefono": "+573003456789",
+        "horario": "L - D 05:30 a 23:00",
+        "servicios": "Supermercado completo y domicilios",
+        "tipo": "socio"
+      },
+      { 
+        "id": "4",
+        "nombre": "Miscelánea Don Jorge (Bronce)", 
+        "direccion": "Carrera 7 #45-23, Bogotá", 
+        "latlng": [4.6372, -74.0665], 
+        "url": "https://bogota.qrcontraentrega.com/miscelaneadonjorge",
+        "telefono": "+573004567890",
+        "horario": "L - S 06:00 a 20:00",
+        "servicios": "Productos varios y artículos de primera necesidad",
+        "tipo": "socio"
+      },
+      { 
+        "id": "5",
+        "nombre": "Distribuidora Norte (Bronce)", 
+        "direccion": "Calle 100 #19-42, Bogotá", 
+        "latlng": [4.6834, -74.0522], 
+        "url": "https://bogota.qrcontraentrega.com/distribuidoranorte",
+        "telefono": "+573005678901",
+        "horario": "L - V 08:00 a 18:00, S 08:00 a 14:00",
+        "servicios": "Distribución mayorista y minorista",
         "tipo": "socio"
       }
     ];
@@ -349,13 +384,24 @@
           document.getElementById('sugerencias-busqueda').style.display = 'none';
         }
       });
+      
+      // Evento para el botón afiliarse
+      document.getElementById('afiliarse-btn').addEventListener('click', function() {
+        // Abrir en una nueva pestaña para evitar problemas con el mapa
+        window.open('https://bogota.qrcontraentrega.com/afiliacion', '_blank');
+      });
     });
 
     function initializeMap() {
+      // Limpiar mapa existente si hay uno
+      if (mapa) {
+        mapa.remove();
+      }
+      
       // Inicializar mapa
       mapa = L.map('mapa', {
-        center: [4.7110, -74.0721], // Coordenadas de Bogotá
-        zoom: 13,
+        center: [4.6514, -74.0779], // Coordenadas del centro de Bogotá
+        zoom: 12,
         zoomControl: false
       });
 
@@ -382,10 +428,10 @@
       // Asegurar que el mapa ocupe todo el espacio disponible
       setTimeout(() => {
         mapa.invalidateSize();
-      }, 0);
+      }, 100);
 
       // Sistema de marcadores
-      const clusters = L.markerClusterGroup({
+      clusters = L.markerClusterGroup({
         iconCreateFunction: cluster => L.divIcon({
           html: `<div>${cluster.getChildCount()}</div>`,
           className: 'cluster-marcadores',
@@ -420,7 +466,7 @@
               </div>
               <div class="popup-button-row">
                 <button class="btn" onclick="abrirGoogleMapsConDireccion('${loc.latlng[0]}', '${loc.latlng[1]}', '${loc.nombre}')">Cómo llegar</button>
-                <button class="btn" onclick="window.open('${loc.url}', '_blank')">Ver Afiliado</button>
+                <button class="btn" onclick="abrirAfiliadoEnNuevaPestana('${loc.url}')">Ver Afiliado</button>
               </div>
             </div>
           </div>
@@ -441,9 +487,11 @@
       if(marcadoresOriginales.length > 0) {
         mapa.fitBounds(clusters.getBounds().pad(0.3));
       }
+    }
 
-      // Solicitar ubicación al cargar la página
-      obtenerUbicacionUsuario();
+    // Función para abrir afiliado en nueva pestaña
+    function abrirAfiliadoEnNuevaPestana(url) {
+      window.open(url, '_blank');
     }
 
     // Función para cambiar a vista de mapa
@@ -512,21 +560,27 @@
         const resultadosSimulados = [
           {
             name: "Centro Comercial Santafé",
-            lat: 4.7824,
-            lng: -74.0454,
+            lat: 4.6975,
+            lng: -74.0447,
             formatted_address: "Autopista Norte #245-60, Bogotá, Colombia"
           },
           {
-            name: "Plaza de Bolívar",
-            lat: 4.5981,
-            lng: -74.0760,
-            formatted_address: "Cl. 10 #, Bogotá, Colombia"
+            name: "Museo Nacional de Colombia",
+            lat: 4.6481,
+            lng: -74.0750,
+            formatted_address: "Carrera 7 #28-66, Bogotá, Colombia"
           },
           {
             name: "Aeropuerto Internacional El Dorado",
             lat: 4.7016,
             lng: -74.1469,
             formatted_address: "Av. El Dorado #103-09, Bogotá, Colombia"
+          },
+          {
+            name: "Parque Metropolitano Simón Bolívar",
+            lat: 4.6812,
+            lng: -74.0914,
+            formatted_address: "Bogotá, Colombia"
           }
         ];
         
@@ -694,13 +748,15 @@
     // Función para centrar el mapa en la ubicación actual
     function centrarMapa() {
       if (userMarker) {
+        // Si ya tenemos marcador de usuario, centrar en él
         mapa.setView(userMarker.getLatLng(), 17);
       } else {
+        // Si no tenemos marcador, obtener ubicación
         obtenerUbicacionUsuario();
       }
     }
 
-    // Función para obtener ubicación del usuario
+    // Función para obtener ubicación del usuario (SOLO CUANDO SE SOLICITA EXPLÍCITAMENTE)
     function obtenerUbicacionUsuario() {
       return new Promise((resolve, reject) => {
         if (navigator.geolocation) {
@@ -711,7 +767,7 @@
               // Verificar si está en Bogotá (aproximadamente)
               const distanciaABogota = calcularDistancia(
                 latitude, longitude,
-                4.7110, -74.0721
+                4.6514, -74.0779
               );
               
               if (distanciaABogota > 30) {
@@ -737,16 +793,19 @@
                 
               // Centrar mapa en la ubicación del usuario avec zoom cercano
               mapa.setView([latitude, longitude], 17);
+              ubicacionActivada = true;
               resolve();
             },
             (error) => {
               console.log(`Error al obtener ubicación: ${error.message}`);
+              alert('No se pudo obtener tu ubicación. Asegúrate de haber permitido el acceso a la ubicación.');
               reject();
             },
-            { enableHighAccuracy: true }
+            { enableHighAccuracy: true, timeout: 10000 }
           );
         } else {
           console.log("Tu navegador no soporta geolocalización.");
+          alert('Tu navegador no soporta geolocalización.');
           reject();
         }
       });
@@ -764,6 +823,16 @@
       const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
       return R * c;
     }
+    
+    // Re-inicializar el mapa cuando la página se vuelve visible (después de volver de otra pestaña)
+    document.addEventListener('visibilitychange', function() {
+      if (!document.hidden) {
+        // Pequeño retraso para asegurar que el DOM esté listo
+        setTimeout(() => {
+          mapa.invalidateSize();
+        }, 300);
+      }
+    });
   </script>
 </body>
 </html>
